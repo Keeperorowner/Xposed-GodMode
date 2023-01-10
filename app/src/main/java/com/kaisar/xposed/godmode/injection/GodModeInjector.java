@@ -4,7 +4,6 @@ import static com.kaisar.xposed.godmode.GodModeApplication.TAG;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -22,13 +21,10 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 
-import androidx.annotation.RequiresApi;
-
 import com.kaisar.xposed.godmode.R;
 import com.kaisar.xposed.godmode.injection.bridge.GodModeManager;
 import com.kaisar.xposed.godmode.injection.bridge.ManagerObserver;
 import com.kaisar.xposed.godmode.injection.hook.ActivityLifecycleHook;
-import com.kaisar.xposed.godmode.injection.hook.DispatchKeyEventHook;
 import com.kaisar.xposed.godmode.injection.hook.DisplayPropertiesHook;
 import com.kaisar.xposed.godmode.injection.hook.EventHandlerHook;
 import com.kaisar.xposed.godmode.injection.hook.SystemPropertiesHook;
@@ -41,10 +37,8 @@ import com.kaisar.xposed.godmode.service.GodModeManagerService;
 import com.kaisar.xservicemanager.XServiceManager;
 
 import java.io.File;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.List;
-import java.util.Optional;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.IXposedHookZygoteInit;
@@ -64,7 +58,7 @@ public final class GodModeInjector implements IXposedHookLoadPackage, IXposedHoo
     public final static Property<ActRules> actRuleProp = new Property<>();
     public static XC_LoadPackage.LoadPackageParam loadPackageParam;
     private static State state = State.UNKNOWN;
-    private static DispatchKeyEventHook dispatchKeyEventHook = new DispatchKeyEventHook();
+    private static ViewSelector viewSelector = new ViewSelector();
 
     enum State {
         UNKNOWN,
@@ -81,7 +75,7 @@ public final class GodModeInjector implements IXposedHookLoadPackage, IXposedHoo
             switchProp.set(enable);
         }
         // 显示侧栏
-        dispatchKeyEventHook.setdisplay(enable);
+        viewSelector.setPanel(enable);
     }
 
     public static void notifyViewRulesChanged(ActRules actRules) {
@@ -120,7 +114,7 @@ public final class GodModeInjector implements IXposedHookLoadPackage, IXposedHoo
                 protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                     //Volume key select old
                     Activity activity = (Activity) param.thisObject;
-                    dispatchKeyEventHook.setactivity(activity);
+//                    onCreate的activity不一定就是当前显示的activity!
                     injectModuleResources(activity.getResources());
                     super.afterHookedMethod(param);
                 }
@@ -292,7 +286,7 @@ public final class GodModeInjector implements IXposedHookLoadPackage, IXposedHoo
         XposedHelpers.findAndHookMethod(View.class, "dispatchTouchEvent", MotionEvent.class, eventHandlerHook);
     }
 
-    public static DispatchKeyEventHook getDispatchKeyEventHook(){
-        return dispatchKeyEventHook;
+    public static ViewSelector getViewSelector(){
+        return viewSelector;
     }
 }
