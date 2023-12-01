@@ -5,8 +5,10 @@ import android.os.IBinder;
 import android.os.ParcelFileDescriptor;
 import android.os.RemoteException;
 
+import com.kaisar.xposed.godmode.GodModeApplication;
 import com.kaisar.xposed.godmode.IGodModeManager;
 import com.kaisar.xposed.godmode.IObserver;
+import com.kaisar.xposed.godmode.injection.util.Logger;
 import com.kaisar.xposed.godmode.rule.ActRules;
 import com.kaisar.xposed.godmode.rule.AppRules;
 import com.kaisar.xposed.godmode.rule.ViewRule;
@@ -29,6 +31,7 @@ public final class GodModeManager {
                     instance = new GodModeManager(IGodModeManager.Stub.asInterface(service));
                 } else {
                     instance = new GodModeManager(new IGodModeManager.Default());
+                    Logger.e("GodMode","No server found !");
                 }
             }
             return instance;

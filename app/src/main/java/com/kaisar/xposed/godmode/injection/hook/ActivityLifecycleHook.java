@@ -93,7 +93,7 @@ public final class ActivityLifecycleHook extends XC_MethodHook implements Proper
 
         final WeakReference<Activity> activityReference;
 
-        OnLayoutChangeListener(Activity activity) {
+         OnLayoutChangeListener(Activity activity) {
             activityReference = new WeakReference<>(activity);
         }
 

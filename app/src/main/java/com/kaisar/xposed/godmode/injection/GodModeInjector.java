@@ -4,7 +4,6 @@ import static com.kaisar.xposed.godmode.GodModeApplication.TAG;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -16,13 +15,10 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.os.Binder;
 import android.os.Build;
-import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
-
-import androidx.annotation.RequiresApi;
 
 import com.kaisar.xposed.godmode.R;
 import com.kaisar.xposed.godmode.injection.bridge.GodModeManager;
@@ -38,13 +34,12 @@ import com.kaisar.xposed.godmode.injection.util.PackageManagerUtils;
 import com.kaisar.xposed.godmode.injection.util.Property;
 import com.kaisar.xposed.godmode.rule.ActRules;
 import com.kaisar.xposed.godmode.service.GodModeManagerService;
+import com.kaisar.xposed.godmode.util.GodMode;
 import com.kaisar.xservicemanager.XServiceManager;
 
 import java.io.File;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.List;
-import java.util.Optional;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.IXposedHookZygoteInit;
@@ -112,7 +107,7 @@ public final class GodModeInjector implements IXposedHookLoadPackage, IXposedHoo
             XServiceManager.initForSystemServer();
             XServiceManager.registerService("godmode", (XServiceManager.ServiceFetcher<Binder>) GodModeManagerService::new);
         } else {//Run in other application processes
-            XposedHelpers.findAndHookMethod(Activity.class, "onCreate", Bundle.class, new XC_MethodHook() {
+            XC_MethodHook tHook = new XC_MethodHook() {
                 @Override
                 protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                     //Volume key select old
@@ -121,8 +116,9 @@ public final class GodModeInjector implements IXposedHookLoadPackage, IXposedHoo
                     injectModuleResources(activity.getResources());
                     super.afterHookedMethod(param);
                 }
-            });
-            registerHook();
+            };
+            XposedHelpers.findAndHookMethod(Activity.class, "onResume", tHook);
+            if (!GodMode.isSelfAppPack(loadPackageParam.packageName)) registerHook();
             GodModeManager gmManager = GodModeManager.getDefault();
             gmManager.addObserver(loadPackageParam.packageName, new ManagerObserver());
             switchProp.set(gmManager.isInEditMode());
@@ -132,6 +128,7 @@ public final class GodModeInjector implements IXposedHookLoadPackage, IXposedHoo
 
     /**
      * Inject resources into hook software - Code from qnotified
+     *
      * @param res Inject software resources
      */
     public static void injectModuleResources(Resources res) {
@@ -278,7 +275,6 @@ public final class GodModeInjector implements IXposedHookLoadPackage, IXposedHoo
         } catch (Throwable e) {
             Logger.e(TAG, "Hook debug layout error", e);
         }
-
 
         EventHandlerHook eventHandlerHook = new EventHandlerHook();
         switchProp.addOnPropertyChangeListener(eventHandlerHook);

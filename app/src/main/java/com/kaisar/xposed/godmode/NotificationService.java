@@ -19,6 +19,9 @@ import androidx.core.app.NotificationManagerCompat;
 import androidx.preference.PreferenceManager;
 
 import com.kaisar.xposed.godmode.injection.bridge.GodModeManager;
+import com.kaisar.xposed.godmode.injection.util.Logger;
+
+import de.robv.android.xposed.XposedBridge;
 
 /**
  * Created by jrsen on 17-10-26.

@@ -15,26 +15,15 @@ import de.robv.android.xposed.XposedHelpers;
 
 import static com.kaisar.xposed.godmode.GodModeApplication.TAG;
 
-public final class DisplayPropertiesHook extends XC_MethodHook implements Property.OnPropertyChangeListener<Boolean> {
+public final class DisplayPropertiesHook extends ASystemPropertiesHook {
 
     private boolean mDebugLayout;
 
     @RequiresApi(api = Build.VERSION_CODES.N)
     @Override
     protected void beforeHookedMethod(MethodHookParam param) {
-        if (mDebugLayout) {
+        if (check(param)) {
             param.setResult(Optional.of(true));
-        }
-    }
-
-    @Override
-    public void onPropertyChange(Boolean debugLayout) {
-        mDebugLayout = debugLayout;
-        try {
-            @SuppressLint("PrivateApi") Class<?> SystemPropertiesClass = Class.forName("android.os.SystemProperties");
-            XposedHelpers.callStaticMethod(SystemPropertiesClass, "callChangeCallbacks");
-        } catch (ClassNotFoundException e) {
-            Logger.e(TAG, "invoke callChangeCallbacks fail", e);
         }
     }
 }

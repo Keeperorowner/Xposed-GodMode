@@ -42,7 +42,7 @@ public final class ViewController {
                 if (blocked) {
                     Logger.i(TAG, String.format("[Success] %s#%s has been blocked", activity, view));
                 } else {
-                    Logger.i(TAG, String.format("[Skipped] %s#%s already be blocked", activity, view));
+                    Logger.d(TAG, String.format("[Skipped] %s#%s already be blocked", activity, view));
                 }
             } catch (NullPointerException e) {
                 Logger.w(TAG, String.format("[Failed] %s#%s block failed because %s", activity, rule.viewClass, e.getMessage()));

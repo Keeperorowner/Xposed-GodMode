@@ -18,6 +18,7 @@ import android.view.ViewParent;
 import android.view.WindowManager;
 import android.widget.Toast;
 
+import com.kaisar.xposed.godmode.R;
 import com.kaisar.xposed.godmode.injection.ViewController;
 import com.kaisar.xposed.godmode.injection.ViewHelper;
 import com.kaisar.xposed.godmode.injection.bridge.GodModeManager;
@@ -27,6 +28,7 @@ import com.kaisar.xposed.godmode.injection.weiget.CancelView;
 import com.kaisar.xposed.godmode.injection.weiget.MaskView;
 import com.kaisar.xposed.godmode.injection.weiget.ParticleView;
 import com.kaisar.xposed.godmode.rule.ViewRule;
+import com.kaisar.xposed.godmode.util.GodMode;
 import com.kaisar.xposed.godmode.util.Preconditions;
 
 import java.lang.ref.WeakReference;
