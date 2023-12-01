@@ -134,7 +134,7 @@ public final class DispatchKeyEventHook extends XC_MethodHook implements Propert
 
                             @Override
                             public void onAnimationEnd(View animView, Animator animation) {
-                                GodModeManager.getDefault().writeRule(activity.getPackageName(), viewRule, snapshot);
+                                GodModeManager.getInstance(true).writeRule(activity.getPackageName(), viewRule, snapshot);
                                 recycleNullableBitmap(snapshot);
                                 particleView.detachFromContainer();
                                 mNodeSelectorPanel.animate()

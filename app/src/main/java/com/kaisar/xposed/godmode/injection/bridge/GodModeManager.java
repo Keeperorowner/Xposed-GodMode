@@ -12,6 +12,8 @@ import com.kaisar.xposed.godmode.injection.util.Logger;
 import com.kaisar.xposed.godmode.rule.ActRules;
 import com.kaisar.xposed.godmode.rule.AppRules;
 import com.kaisar.xposed.godmode.rule.ViewRule;
+import com.kaisar.xposed.godmode.service.GodModeManagerService;
+import com.kaisar.xposed.godmode.service.RemoteGMManager;
 import com.kaisar.xservicemanager.XServiceManager;
 
 public final class GodModeManager {
@@ -23,6 +25,23 @@ public final class GodModeManager {
         this.mGMM = gmm;
     }
 
+    public static boolean isXpHooked() {
+        return false;
+    }
+
+    public static GodModeManager getInstance(boolean pRemote) {
+        synchronized (GodModeManager.class) {
+            if (instance == null) {
+                if (pRemote) {
+                    instance = new GodModeManager(new RemoteGMManager());
+                } else {
+                    instance = new GodModeManager(new GodModeManagerService(null));
+                }
+            }
+            return instance;
+        }
+    }
+
     public static GodModeManager getDefault() {
         synchronized (GodModeManager.class) {
             if (instance == null) {
@@ -31,7 +50,7 @@ public final class GodModeManager {
                     instance = new GodModeManager(IGodModeManager.Stub.asInterface(service));
                 } else {
                     instance = new GodModeManager(new IGodModeManager.Default());
-                    Logger.e("GodMode","No server found !");
+                    Logger.e("GodMode", "No server found !");
                 }
             }
             return instance;

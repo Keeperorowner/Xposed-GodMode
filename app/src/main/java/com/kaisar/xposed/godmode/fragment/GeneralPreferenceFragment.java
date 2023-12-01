@@ -161,7 +161,7 @@ public final class GeneralPreferenceFragment extends PreferenceFragmentCompat im
         mProgressPreference = (ProgressPreference) findPreference(getString(R.string.pref_key_progress_indicator));
         mProgressPreference.setVisible(false);
         mEditorSwitchPreference = (SwitchPreferenceCompat) findPreference(getString(R.string.pref_key_editor));
-        mEditorSwitchPreference.setChecked(GodModeManager.getDefault().isInEditMode());
+        mEditorSwitchPreference.setChecked(GodModeManager.getInstance(false).isInEditMode());
         mEditorSwitchPreference.setOnPreferenceClickListener(this);
         mEditorSwitchPreference.setOnPreferenceChangeListener(this);
         mJoinGroupPreference = findPreference(getString(R.string.pref_key_join_group));
@@ -174,7 +174,7 @@ public final class GeneralPreferenceFragment extends PreferenceFragmentCompat im
         if (previousVersionCode != BuildConfig.VERSION_CODE) {
             sp.edit().putInt(KEY_VERSION_CODE, BuildConfig.VERSION_CODE).apply();
             showUpdatePolicyDialog();
-        } else if (!GodModeManager.getDefault().hasLight()) {
+        } else if (!GodModeManager.isXpHooked()) {
             showEnableModuleDialog();
         }
     }
@@ -194,11 +194,11 @@ public final class GeneralPreferenceFragment extends PreferenceFragmentCompat im
     @Override
     public boolean onPreferenceClick(Preference preference) {
         if (mEditorSwitchPreference == preference) {
-            if (!GodModeManager.getDefault().hasLight()) {
+            if (!GodModeManager.isXpHooked()) {
                 Toast.makeText(requireContext(), R.string.not_active_module, Toast.LENGTH_SHORT).show();
                 return true;
             }
-            GodModeManager.getDefault().setEditMode(mEditorSwitchPreference.isChecked());
+            GodModeManager.getInstance(false).setEditMode(mEditorSwitchPreference.isChecked());
         } else if (mJoinGroupPreference == preference) {
             showGroupInfoDialog();
         } else if (mDonatePreference == preference) {

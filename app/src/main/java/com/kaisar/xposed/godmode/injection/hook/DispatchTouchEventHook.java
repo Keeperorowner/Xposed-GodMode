@@ -180,7 +180,7 @@ public final class DispatchTouchEventHook extends XC_MethodHook {
                     //Make original view gone
                     mViewRule.visibility = View.GONE;
                     ViewController.applyRule(v, mViewRule);
-                    GodModeManager.getDefault().writeRule(v.getContext().getPackageName(), mViewRule, mSnapshot);
+                    GodModeManager.getInstance(true).writeRule(v.getContext().getPackageName(), mViewRule, mSnapshot);
                     recycleNullableBitmap(mSnapshot);
                     mMaskView.detachFromContainer();
                 }
