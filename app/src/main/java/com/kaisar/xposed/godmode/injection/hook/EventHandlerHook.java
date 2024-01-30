@@ -241,7 +241,14 @@ public final class EventHandlerHook extends XC_MethodHook implements Property.On
                     mViewRule.visibility = View.GONE;
                     ViewController.applyRule(v, mViewRule);
                     GodModeManager.getInstance().writeRule(v.getContext().getPackageName(), mViewRule, mSnapshot);
-                    GodModeInjector.addRollbackRule(v, mViewRule);
+                    int tPos = GodModeInjector.dispatchKeyEventHook.mViewNodes.indexOf(new WeakReference<>(v));
+                    if (tPos != -1) {
+                        GodModeInjector.dispatchKeyEventHook.mViewNodes.remove(tPos);
+                        if (GodModeInjector.dispatchKeyEventHook.mCurrentViewIndex >= tPos) {
+                            GodModeInjector.dispatchKeyEventHook.seekbarreduce();
+                        }
+                    } else tPos = 0;
+                    GodModeInjector.addRollbackRule(v, mViewRule, tPos == -1 ? 0 : tPos);
                     recycleNullableBitmap(mSnapshot);
                     mMaskView.detachFromContainer();
                 }

@@ -37,6 +37,7 @@ import com.kaisar.xposed.godmode.injection.weiget.CancelView;
 import com.kaisar.xposed.godmode.injection.weiget.IdView;
 import com.kaisar.xposed.godmode.injection.weiget.MaskView;
 import com.kaisar.xposed.godmode.injection.weiget.ParticleView;
+import com.kaisar.xposed.godmode.rule.RuleCache;
 import com.kaisar.xposed.godmode.rule.ViewRule;
 
 import java.lang.ref.WeakReference;
@@ -52,8 +53,8 @@ import de.robv.android.xposed.XposedHelpers;
 public final class DispatchKeyEventHook extends XC_MethodHook implements Property.OnPropertyChangeListener<Boolean>, SeekBar.OnSeekBarChangeListener {
 
     private static final int OVERLAY_COLOR = Color.argb(150, 255, 0, 0);
-    private final List<WeakReference<View>> mViewNodes = new ArrayList<>();
-    private int mCurrentViewIndex = 0;
+    public final List<WeakReference<View>> mViewNodes = new ArrayList<>();
+    public int mCurrentViewIndex = 0;
 
     private MaskView mMaskView;
     private View mNodeSelectorPanel;
@@ -158,7 +159,7 @@ public final class DispatchKeyEventHook extends XC_MethodHook implements Propert
                             @Override
                             public void onAnimationEnd(View animView, Animator animation) {
                                 GodModeManager.getInstance().writeRule(activity.getPackageName(), viewRule, snapshot);
-                                GodModeInjector.addRollbackRule(view, viewRule);
+                                GodModeInjector.addRollbackRule(view, viewRule,mCurrentViewIndex);
                                 recycleNullableBitmap(snapshot);
                                 particleView.detachFromContainer();
                                 mNodeSelectorPanel.animate()
@@ -235,11 +236,14 @@ public final class DispatchKeyEventHook extends XC_MethodHook implements Propert
             Toast.makeText(activity, GmResources.getString(R.string.rollback_none), Toast.LENGTH_SHORT).show();
             return;
         }
-        Pair<WeakReference<View>, ViewRule> pop = GodModeInjector.mRollbackRules.pop();
+        RuleCache pop = GodModeInjector.mRollbackRules.pop();
 
-        if (GodModeManager.getInstance().deleteRule(BuildConfig.APPLICATION_ID, pop.second)) {
-            ViewController.revokeRule(pop.first.get(), pop.second);
+        if (GodModeManager.getInstance().deleteRule(BuildConfig.APPLICATION_ID, pop.rule)) {
+            ViewController.revokeRule(pop.view.get(), pop.rule);
             Toast.makeText(activity, "已经还原 !", Toast.LENGTH_SHORT).show();
+            mViewNodes.add(pop.pos, pop.view);
+            if (pop.pos <= mCurrentViewIndex) seekbaradd();
+            seekbar.setMax(mViewNodes.size() - 1);
         } else {
             Toast.makeText(activity, "天地啊 ! 还原失败了", Toast.LENGTH_SHORT).show();
         }
@@ -254,7 +258,7 @@ public final class DispatchKeyEventHook extends XC_MethodHook implements Propert
         onProgressChanged(seekbar, Progress, true);
     }
 
-    private void seekbarreduce() {
+    public void seekbarreduce() {
         if (seekbar.getProgress() == 0) {
             return;
         }

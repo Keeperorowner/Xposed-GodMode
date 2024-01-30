@@ -38,6 +38,7 @@ import com.kaisar.xposed.godmode.injection.util.Logger;
 import com.kaisar.xposed.godmode.injection.util.PackageManagerUtils;
 import com.kaisar.xposed.godmode.injection.util.Property;
 import com.kaisar.xposed.godmode.rule.ActRules;
+import com.kaisar.xposed.godmode.rule.RuleCache;
 import com.kaisar.xposed.godmode.rule.ViewRule;
 import com.kaisar.xposed.godmode.service.RemoteGMManager;
 import com.kaisar.xposed.godmode.service.RuleUpdateReceiver;
@@ -67,8 +68,8 @@ public final class GodModeInjector implements IXposedHookLoadPackage, IXposedHoo
     public final static Property<ActRules> actRuleProp = new Property<>();
     public static XC_LoadPackage.LoadPackageParam loadPackageParam;
     private static State state = State.UNKNOWN;
-    private static DispatchKeyEventHook dispatchKeyEventHook = new DispatchKeyEventHook();
-    public static Stack<Pair<WeakReference<View>, ViewRule>> mRollbackRules = new Stack<>();
+    public static final DispatchKeyEventHook dispatchKeyEventHook = new DispatchKeyEventHook();
+    public static Stack<RuleCache> mRollbackRules = new Stack<>();
 
     enum State {
         UNKNOWN,
@@ -76,8 +77,8 @@ public final class GodModeInjector implements IXposedHookLoadPackage, IXposedHoo
         BLOCKED
     }
 
-    public static void addRollbackRule(View pV, ViewRule pRule) {
-        mRollbackRules.push(new Pair<>(new WeakReference<>(pV), pRule));
+    public static void addRollbackRule(View pV, ViewRule pRule, int pPos) {
+        mRollbackRules.push(new RuleCache(pV, pRule, pPos));
     }
 
     public static void notifyEditModeChanged(boolean enable) {
