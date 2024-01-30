@@ -202,12 +202,7 @@ public final class ViewHelper {
         String viewClassName = v.getClass().getName();
         Context context = v.getContext();
         Resources res = context.getResources();
-        String resourceName = null;
-        try {
-            resourceName = v.getId() != View.NO_ID ? res.getResourceName(v.getId()) : null;
-        } catch (Resources.NotFoundException ignore) {
-            //the resource id may be declared in the plugin apk
-        }
+        String resourceName = getResourceName(v);
         String text = (v instanceof TextView && !TextUtils.isEmpty(((TextView) v).getText())) ? ((TextView) v).getText().toString() : "";
         String description = (!TextUtils.isEmpty(v.getContentDescription())) ? v.getContentDescription().toString() : "";
         String alias = !TextUtils.isEmpty(text) ? text : description;
@@ -217,6 +212,18 @@ public final class ViewHelper {
         String versionName = packageInfo.versionName;
         int versionCode = packageInfo.versionCode;
         return new ViewRule(label, packageName, versionName, versionCode, BuildConfig.VERSION_CODE, "", alias, x, y, width, height, viewHierarchyDepth, activityClassName, viewClassName, resourceName, text, description, View.INVISIBLE, System.currentTimeMillis());
+    }
+
+    public static String getResourceName(View v) {
+        Context context = v.getContext();
+        Resources res = context.getResources();
+        String resourceName = null;
+        try {
+            resourceName = v.getId() != View.NO_ID ? res.getResourceName(v.getId()) : null;
+        } catch (Resources.NotFoundException ignore) {
+            //the resource id may be declared in the plugin apk
+        }
+        return resourceName;
     }
 
     public static Activity getAttachedActivityFromView(View view) {

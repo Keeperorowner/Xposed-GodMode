@@ -9,6 +9,12 @@
                 android:key="@string/pref_key_editor"
                 android:summary="@string/pref_description_god_mode"
                 android:title="@string/pref_title_god_mode" />
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:icon="@drawable/notice"
+            android:key="edit_notice"
+            android:summary="开开你的"
+            android:title="开关通知栏消息" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/pref_header_support">

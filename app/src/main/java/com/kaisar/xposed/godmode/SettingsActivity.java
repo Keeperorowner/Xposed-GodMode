@@ -11,7 +11,11 @@ import androidx.navigation.Navigation;
 import androidx.navigation.ui.AppBarConfiguration;
 import androidx.navigation.ui.NavigationUI;
 
+import com.kaisar.xposed.godmode.injection.bridge.GodModeManager;
+
 public class SettingsActivity extends AppCompatActivity {
+
+    private boolean mNoticeStatus = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -27,12 +31,23 @@ public class SettingsActivity extends AppCompatActivity {
         Toolbar toolbar = findViewById(R.id.main_toolbar);
         setSupportActionBar(toolbar);
         NavigationUI.setupWithNavController(toolbar, navController, appBarConfiguration);
-        startNotificationService();
+        //startNotificationService();
+
+        startService(new Intent(this, ViewRuleService.class));
     }
 
     private void startNotificationService() {
         Intent notificationService = new Intent(this, NotificationService.class);
         startService(notificationService);
+    }
+
+    public void setNoticeStatus(boolean pEnable) {
+        if (pEnable != this.mNoticeStatus) {
+            Intent notificationService = new Intent(this, NotificationService.class);
+            if (pEnable) startService(notificationService);
+            else stopService(notificationService);
+            this.mNoticeStatus = pEnable;
+        }
     }
 
 }

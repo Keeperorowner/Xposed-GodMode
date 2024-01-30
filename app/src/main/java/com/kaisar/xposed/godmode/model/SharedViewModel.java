@@ -87,15 +87,15 @@ public class SharedViewModel extends ViewModel {
     }
 
     public boolean deleteAppRules(String packageName) {
-        return GodModeManager.getDefault().deleteRules(packageName);
+        return GodModeManager.getInstance().deleteRules(packageName);
     }
 
     public boolean updateRule(ViewRule rule) {
-        return GodModeManager.getDefault().updateRule(rule.packageName, rule);
+        return GodModeManager.getInstance().updateRule(rule.packageName, rule);
     }
 
     public boolean deleteRule(ViewRule rule) {
-        return GodModeManager.getDefault().deleteRule(rule.packageName, rule);
+        return GodModeManager.getInstance().deleteRule(rule.packageName, rule);
     }
 
     public void setIconHidden(Context context, boolean hidden) {

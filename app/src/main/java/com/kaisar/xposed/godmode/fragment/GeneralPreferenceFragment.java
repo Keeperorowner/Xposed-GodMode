@@ -40,6 +40,7 @@ import com.kaisar.xposed.godmode.BuildConfig;
 import com.kaisar.xposed.godmode.CrashHandler;
 import com.kaisar.xposed.godmode.GodModeApplication;
 import com.kaisar.xposed.godmode.R;
+import com.kaisar.xposed.godmode.SettingsActivity;
 import com.kaisar.xposed.godmode.bean.GroupInfo;
 import com.kaisar.xposed.godmode.injection.bridge.GodModeManager;
 import com.kaisar.xposed.godmode.model.SharedViewModel;
@@ -72,6 +73,7 @@ public final class GeneralPreferenceFragment extends PreferenceFragmentCompat im
 
     private ProgressPreference mProgressPreference;
     private SwitchPreferenceCompat mEditorSwitchPreference;
+    private SwitchPreferenceCompat mEditorNotice;
     private Preference mJoinGroupPreference;
     private Preference mDonatePreference;
 
@@ -161,9 +163,14 @@ public final class GeneralPreferenceFragment extends PreferenceFragmentCompat im
         mProgressPreference = (ProgressPreference) findPreference(getString(R.string.pref_key_progress_indicator));
         mProgressPreference.setVisible(false);
         mEditorSwitchPreference = (SwitchPreferenceCompat) findPreference(getString(R.string.pref_key_editor));
-        mEditorSwitchPreference.setChecked(GodModeManager.getInstance(false).isInEditMode());
+        mEditorSwitchPreference.setChecked(GodModeManager.getInstance().isInEditMode());
         mEditorSwitchPreference.setOnPreferenceClickListener(this);
         mEditorSwitchPreference.setOnPreferenceChangeListener(this);
+        //mEditorNotice
+        mEditorNotice = (SwitchPreferenceCompat) findPreference("edit_notice");
+        mEditorNotice.setChecked(GodModeManager.getInstance().isInEditMode());
+        mEditorNotice.setOnPreferenceClickListener(this);
+        mEditorNotice.setOnPreferenceChangeListener(this);
         mJoinGroupPreference = findPreference(getString(R.string.pref_key_join_group));
         mJoinGroupPreference.setOnPreferenceClickListener(this);
         mDonatePreference = findPreference(getString(R.string.pref_key_donate));
@@ -198,7 +205,11 @@ public final class GeneralPreferenceFragment extends PreferenceFragmentCompat im
                 Toast.makeText(requireContext(), R.string.not_active_module, Toast.LENGTH_SHORT).show();
                 return true;
             }
-            GodModeManager.getInstance(false).setEditMode(mEditorSwitchPreference.isChecked());
+            GodModeManager.getInstance().setEditMode(mEditorSwitchPreference.isChecked());
+            mEditorNotice.setChecked(mEditorSwitchPreference.isChecked());
+            ((SettingsActivity) requireActivity()).setNoticeStatus(mEditorSwitchPreference.isChecked());
+        } else if (mEditorNotice == preference) {
+            ((SettingsActivity) requireActivity()).setNoticeStatus(mEditorNotice.isChecked());
         } else if (mJoinGroupPreference == preference) {
             showGroupInfoDialog();
         } else if (mDonatePreference == preference) {

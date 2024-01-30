@@ -21,7 +21,7 @@ public final class GodModeManager {
     private static GodModeManager instance;
     private final IGodModeManager mGMM;
 
-    private GodModeManager(IGodModeManager gmm) {
+    public GodModeManager(IGodModeManager gmm) {
         this.mGMM = gmm;
     }
 
@@ -29,17 +29,16 @@ public final class GodModeManager {
         return false;
     }
 
-    public static GodModeManager getInstance(boolean pRemote) {
+    public static GodModeManager getInstance() {
         synchronized (GodModeManager.class) {
-            if (instance == null) {
-                if (pRemote) {
-                    instance = new GodModeManager(new RemoteGMManager());
-                } else {
-                    instance = new GodModeManager(new GodModeManagerService(null));
-                }
-            }
+            if (instance == null) instance = getServerImpl();
             return instance;
         }
+    }
+
+    private static GodModeManager getServerImpl() {
+        // 默认的服务器实现,远程服务使用xposed hook来返回不同的值
+        return new GodModeManager(new GodModeManagerService(GodModeApplication.getApplication().getBaseContext()));
     }
 
     public static GodModeManager getDefault() {

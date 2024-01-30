@@ -198,7 +198,7 @@ public final class ViewRuleDetailsFragment extends PreferenceFragmentCompat impl
         @Override
         public Bitmap loadInBackground() {
             try {
-                try (ParcelFileDescriptor parcelFileDescriptor = GodModeManager.getInstance(false).openImageFileDescriptor(mViewRule.imagePath)) {
+                try (ParcelFileDescriptor parcelFileDescriptor = GodModeManager.getInstance().openImageFileDescriptor(mViewRule.imagePath)) {
                     Objects.requireNonNull(parcelFileDescriptor, String.format("Can not open %s", mViewRule.imagePath));
                     Bitmap bitmap = BitmapFactory.decodeFileDescriptor(parcelFileDescriptor.getFileDescriptor()).copy(Bitmap.Config.ARGB_8888, true);
                     Bitmap newBitmap = bitmap.copy(bitmap.getConfig(), true);

@@ -35,6 +35,9 @@ public final class ActRules extends HashMap<String, List<ViewRule>> implements P
         return 0;
     }
 
+    public transient static final ActRules EMPTY = new ActRules();
+    public transient String mJson = "";
+
     public static final Creator<ActRules> CREATOR = new Creator<ActRules>() {
         @Override
         public ActRules createFromParcel(Parcel in) {

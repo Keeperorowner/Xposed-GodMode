@@ -11,7 +11,7 @@ public final class LocalRepository {
     }
 
     public static AppRules loadAppRules() {
-        return GodModeManager.getInstance(false).getAllRules();
+        return GodModeManager.getInstance().getAllRules();
     }
 
 }

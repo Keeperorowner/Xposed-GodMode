@@ -6,6 +6,7 @@ import static com.kaisar.xposed.godmode.injection.util.FileUtils.S_IRWXO;
 import static com.kaisar.xposed.godmode.injection.util.FileUtils.S_IRWXU;
 
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.Binder;
 import android.os.Environment;
@@ -60,7 +61,7 @@ import de.robv.android.xposed.XposedBridge;
 public final class GodModeManagerService extends IGodModeManager.Stub implements Handler.Callback {
 
     // /data/system/godmode
-    private static final String BASE_DIR = String.format("%s/system/%s", Environment.getDataDirectory().getAbsolutePath(), "godmode");
+    private final String BASE_DIR;
     // /data/system/godmode/conf
     private static final String CONFIG_FILE_NAME = "conf";
     // /data/system/godmode/{package}/package.rule
@@ -87,6 +88,8 @@ public final class GodModeManagerService extends IGodModeManager.Stub implements
         HandlerThread workThread = new HandlerThread("work-thread");
         workThread.start();
         mHandle = new Handler(workThread.getLooper(), this);
+        BASE_DIR = String.format("%s/%s", this.mContext.getFilesDir().getAbsolutePath(), "godmode");
+
         try {
             loadRuleData();
             mStarted = true;
@@ -109,6 +112,7 @@ public final class GodModeManagerService extends IGodModeManager.Stub implements
                     Gson gson = new GsonBuilder().setPrettyPrinting().create();
                     ActRules rules = gson.fromJson(json, ActRules.class);
                     Preconditions.checkNotNull(rules, "rules is null");
+                    rules.mJson = json;
                     //compact rule
                     Iterator<Map.Entry<String, List<ViewRule>>> iterator = rules.entrySet().iterator();
                     while (iterator.hasNext()) {
@@ -116,6 +120,10 @@ public final class GodModeManagerService extends IGodModeManager.Stub implements
                         List<ViewRule> value = listEntry.getValue();
                         if (value == null || value.isEmpty()) {
                             iterator.remove();
+                        } else if (value.iterator().next().imagePath.contains("system")) {
+                            for (ViewRule sRule : value) {
+                                sRule.imagePath = packageDir.getAbsolutePath() + "/" + new File(sRule.imagePath).getName();
+                            }
                         }
                     }
                     if (rules.isEmpty()) {
@@ -149,6 +157,7 @@ public final class GodModeManagerService extends IGodModeManager.Stub implements
                     viewRule.imagePath = saveBitmap(snapshot, appDataDir);
                     Gson gson = new GsonBuilder().setPrettyPrinting().create();
                     String json = gson.toJson(actRules);
+                    actRules.mJson = json;
                     String appRuleFilePath = getAppRuleFilePath(packageName);
                     FileUtils.stringToFile(appRuleFilePath, json);
                     notifyObserverRuleChanged(packageName, actRules);
@@ -156,16 +165,19 @@ public final class GodModeManagerService extends IGodModeManager.Stub implements
                     mLogger.w("write rule failed", e);
                 }
             }
-            break;
+            return true;
+            // 隔断操作，以下均需要发送规则变动广播
             case DELETE_RULE: {
                 try {
                     Object[] args = (Object[]) msg.obj;
                     ActRules actRules = (ActRules) args[0];
                     String packageName = (String) args[1];
                     ViewRule viewRule = (ViewRule) args[2];
-                    FileUtils.delete(viewRule.imagePath);
+                    if (!TextUtils.isEmpty(viewRule.imagePath))
+                        FileUtils.delete(viewRule.imagePath);
                     Gson gson = new GsonBuilder().setPrettyPrinting().create();
                     String json = gson.toJson(actRules);
+                    actRules.mJson = json;
                     FileUtils.stringToFile(getAppRuleFilePath(packageName), json);
                     notifyObserverRuleChanged(packageName, actRules);
                 } catch (IOException e) {
@@ -190,6 +202,7 @@ public final class GodModeManagerService extends IGodModeManager.Stub implements
                     String packageName = (String) args[1];
                     Gson gson = new GsonBuilder().setPrettyPrinting().create();
                     String json = gson.toJson(actRules);
+                    actRules.mJson = json;
                     FileUtils.stringToFile(getAppRuleFilePath(packageName), json);
                     notifyObserverRuleChanged(packageName, actRules);
                 } catch (IOException e) {
@@ -202,6 +215,8 @@ public final class GodModeManagerService extends IGodModeManager.Stub implements
             }
             break;
         }
+        this.mContext.sendBroadcast(new Intent(RuleUpdateReceiver.MSG_UPDATE_RULE));
+
         return true;
     }
 
@@ -238,10 +253,16 @@ public final class GodModeManagerService extends IGodModeManager.Stub implements
      */
     @Override
     public void setEditMode(boolean enable) throws RemoteException {
-        enforcePermission("set edit mode fail permission denied");
+        //enforcePermission("set edit mode fail permission denied");
         if (!mStarted) return;
-        mInEditMode = enable;
-        notifyObserverEditModeChanged(enable);
+        if (mInEditMode != enable) {
+            mInEditMode = enable;
+            notifyObserverEditModeChanged(enable);
+
+            Intent tIntent = new Intent(RuleUpdateReceiver.MSG_EDIT_MODE);
+            tIntent.putExtra("value", mInEditMode);
+            this.mContext.sendBroadcast(tIntent);
+        }
     }
 
     /**
@@ -262,7 +283,7 @@ public final class GodModeManagerService extends IGodModeManager.Stub implements
      */
     @Override
     public void addObserver(String packageName, IObserver observer) throws RemoteException {
-        enforcePermission(new String[]{packageName, BuildConfig.APPLICATION_ID}, "register observer fail permission denied");
+        //enforcePermission(new String[]{packageName, BuildConfig.APPLICATION_ID}, "register observer fail permission denied");
         if (!mStarted) return;
         synchronized (mRemoteCallbackList) {
             mRemoteCallbackList.register(new ObserverProxy(packageName, observer));
@@ -304,10 +325,10 @@ public final class GodModeManagerService extends IGodModeManager.Stub implements
      * @return rules
      */
     @Override
-    public ActRules getRules(String packageName) throws RemoteException {
-        enforcePermission(new String[]{packageName, BuildConfig.APPLICATION_ID}, "get rules fail permission denied");
-        if (!mStarted) return new ActRules();
-        return mAppRulesCache.containsKey(packageName) ? mAppRulesCache.get(packageName) : new ActRules();
+    public ActRules getRules(String packageName) {
+        //enforcePermission(new String[]{packageName, BuildConfig.APPLICATION_ID}, "get rules fail permission denied");
+        if (!mStarted) return ActRules.EMPTY;
+        return mAppRulesCache.containsKey(packageName) ? mAppRulesCache.get(packageName) : ActRules.EMPTY;
     }
 
     /**
@@ -319,7 +340,8 @@ public final class GodModeManagerService extends IGodModeManager.Stub implements
      */
     @Override
     public boolean writeRule(String packageName, ViewRule viewRule, Bitmap snapshot) throws RemoteException {
-        enforcePermission(new String[]{packageName, BuildConfig.APPLICATION_ID}, "write rule fail permission denied");
+        //enforcePermission(new String[]{packageName, BuildConfig.APPLICATION_ID}, "write rule fail permission denied");
+        Logger.i("GodMode", "规则写入: " + packageName);
         if (!mStarted) return false;
         try {
             ActRules actRules = mAppRulesCache.get(packageName);
@@ -348,7 +370,7 @@ public final class GodModeManagerService extends IGodModeManager.Stub implements
      */
     @Override
     public boolean updateRule(String packageName, ViewRule viewRule) throws RemoteException {
-        enforcePermission("update rule fail permission denied");
+        //enforcePermission("update rule fail permission denied");
         if (!mStarted) return false;
         try {
             ActRules actRules = mAppRulesCache.get(packageName);
@@ -382,7 +404,7 @@ public final class GodModeManagerService extends IGodModeManager.Stub implements
      */
     @Override
     public boolean deleteRule(String packageName, ViewRule viewRule) throws RemoteException {
-        enforcePermission("delete rule fail permission denied");
+        //enforcePermission("delete rule fail permission denied");
         if (!mStarted) return false;
         try {
             ActRules actRules = Preconditions.checkNotNull(mAppRulesCache.get(packageName), "not found this rule can't delete.");
@@ -412,7 +434,7 @@ public final class GodModeManagerService extends IGodModeManager.Stub implements
      */
     @Override
     public boolean deleteRules(String packageName) throws RemoteException {
-        enforcePermission("delete rules fail permission denied");
+        //enforcePermission("delete rules fail permission denied");
         if (!mStarted) return false;
         mLogger.d("delete rules pkg=" + packageName + " cache=" + mAppRulesCache);
         if (mAppRulesCache.containsKey(packageName)) {

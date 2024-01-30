@@ -16,7 +16,9 @@ import androidx.annotation.Nullable;
 
 import com.kaisar.xposed.godmode.R;
 import com.kaisar.xposed.godmode.injection.util.GmResources;
+import com.kaisar.xposed.godmode.injection.util.Logger;
 
+import static com.kaisar.xposed.godmode.GodModeApplication.TAG;
 import static com.kaisar.xposed.godmode.injection.ViewHelper.TAG_GM_CMP;
 
 /**
@@ -24,14 +26,16 @@ import static com.kaisar.xposed.godmode.injection.ViewHelper.TAG_GM_CMP;
  */
 
 @SuppressLint("AppCompatCustomView")
-public final class CancelView extends View {
+public class CancelView extends View {
 
-    private final Paint rectPaint = new Paint();
-    private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private CharSequence text;
-    private Rect statusBarBounds = new Rect();
-    private Rect textLayoutBounds = new Rect();
-    private Rect textBounds = new Rect();
+    protected final Paint rectPaint = new Paint();
+    protected final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    protected CharSequence text;
+    protected Rect statusBarBounds = new Rect();
+    protected Rect textLayoutBounds = new Rect();
+    protected Rect textBounds = new Rect();
+    protected String mViewId = "组件未命名";
+    protected Rect idBounds = new Rect();
 
     public CancelView(Context context) {
         this(context, null);
@@ -51,7 +55,13 @@ public final class CancelView extends View {
         initWidget(context);
     }
 
-    private void initWidget(Context context) {
+    public void setOpViewName(String pName) {
+        this.mViewId = pName == null ? "组件未命名" : pName;
+        textPaint.getTextBounds(this.mViewId, 0, this.mViewId.length(), idBounds);
+        idBounds.offsetTo(0, 0);
+    }
+
+    protected void initWidget(Context context) {
         text = GmResources.getText(R.string.top_revert_tip);
         rectPaint.setStyle(Paint.Style.FILL);
         rectPaint.setColor(Color.argb(230, 139, 195, 75));
@@ -63,6 +73,7 @@ public final class CancelView extends View {
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
         setLayoutParams(lp);
+        setOpViewName(this.mViewId); //更新id默认位置
     }
 
     public int getStatusBarHeight() {
@@ -92,8 +103,12 @@ public final class CancelView extends View {
 
         //draw text
         float x = textLayoutBounds.centerX() - textBounds.centerX();
-        float y = textLayoutBounds.centerY() + textBounds.centerY();
+        float y = textLayoutBounds.centerY() - textBounds.centerY() - 2;
         canvas.drawText(text, 0, text.length(), x, y, textPaint);
+        x = textLayoutBounds.centerX() - idBounds.centerX();
+        y = textLayoutBounds.centerY() + idBounds.centerY() * 2 + 2;
+        canvas.drawText(this.mViewId, 0, this.mViewId.length(), x, y, textPaint);
+
         canvas.restore();
     }
 

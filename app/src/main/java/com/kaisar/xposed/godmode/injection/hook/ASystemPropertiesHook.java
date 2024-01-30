@@ -10,7 +10,6 @@ import androidx.annotation.RequiresApi;
 import com.kaisar.xposed.godmode.GodModeApplication;
 import com.kaisar.xposed.godmode.injection.util.Logger;
 import com.kaisar.xposed.godmode.injection.util.Property;
-import com.kaisar.xposed.godmode.util.GodMode;
 
 import java.util.Optional;
 

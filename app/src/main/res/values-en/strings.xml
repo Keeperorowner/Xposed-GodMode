@@ -63,4 +63,5 @@
     <string name="fetch_group_list_err1">Error: group list is empty</string>
     <string name="fetch_group_list_err2">Error: unknown exception</string>
     <string name="fetch_group_list_err3">Error: %1$s</string>
+    <string name="rollback_none">Oh,no more to rollback</string>
 </resources>

@@ -8,6 +8,8 @@ import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.Rect;
+import android.os.Build;
+import android.util.Pair;
 import android.view.Display;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -21,6 +23,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.widget.TooltipCompat;
 
+import com.kaisar.xposed.godmode.BuildConfig;
 import com.kaisar.xposed.godmode.GodModeApplication;
 import com.kaisar.xposed.godmode.R;
 import com.kaisar.xposed.godmode.injection.GodModeInjector;
@@ -30,15 +33,17 @@ import com.kaisar.xposed.godmode.injection.bridge.GodModeManager;
 import com.kaisar.xposed.godmode.injection.util.GmResources;
 import com.kaisar.xposed.godmode.injection.util.Logger;
 import com.kaisar.xposed.godmode.injection.util.Property;
+import com.kaisar.xposed.godmode.injection.weiget.CancelView;
+import com.kaisar.xposed.godmode.injection.weiget.IdView;
 import com.kaisar.xposed.godmode.injection.weiget.MaskView;
 import com.kaisar.xposed.godmode.injection.weiget.ParticleView;
 import com.kaisar.xposed.godmode.rule.ViewRule;
-import com.kaisar.xposed.godmode.util.GodMode;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Stack;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
@@ -53,16 +58,32 @@ public final class DispatchKeyEventHook extends XC_MethodHook implements Propert
     private MaskView mMaskView;
     private View mNodeSelectorPanel;
     private Activity activity = null;
+    private WeakReference<Activity> preAct = new WeakReference<>(null);
     private SeekBar seekbar = null;
     public static volatile boolean mKeySelecting = false;
+    private IdView mIdView = null;
 
     public void setactivity(final Activity a) {
+        if (activity != null && a != activity) setdisplay(false); //app内activity自动切换
+
         activity = a;
+        if (activity != null && GodModeInjector.switchProp.get()) {
+            if (this.mMaskView != null) setdisplay(false); //先关闭旧的按钮界面
+            setdisplay(true);
+        }
+    }
+
+    public Activity getCurrentAct() {
+        return this.activity;
     }
 
     public void setdisplay(Boolean display) {
         if (activity == null) return;
         if (display) {
+            if (preAct.get() != null && preAct.get() != activity) {
+                // 切换activity后,清空用于回滚的规则
+                GodModeInjector.mRollbackRules.clear();
+            }
             showNodeSelectPanel(activity);
         } else {
             dismissNodeSelectPanel();
@@ -103,6 +124,8 @@ public final class DispatchKeyEventHook extends XC_MethodHook implements Propert
         mMaskView = MaskView.makeMaskView(activity);
         mMaskView.setMaskOverlay(OVERLAY_COLOR);
         mMaskView.attachToContainer(container);
+        this.mIdView = new IdView(activity);
+        this.mIdView.attachToContainer(container);
         try {
             GodModeInjector.injectModuleResources(activity.getResources());
             LayoutInflater layoutInflater = LayoutInflater.from(activity);
@@ -134,7 +157,8 @@ public final class DispatchKeyEventHook extends XC_MethodHook implements Propert
 
                             @Override
                             public void onAnimationEnd(View animView, Animator animation) {
-                                GodModeManager.getInstance(true).writeRule(activity.getPackageName(), viewRule, snapshot);
+                                GodModeManager.getInstance().writeRule(activity.getPackageName(), viewRule, snapshot);
+                                GodModeInjector.addRollbackRule(view, viewRule);
                                 recycleNullableBitmap(snapshot);
                                 particleView.detachFromContainer();
                                 mNodeSelectorPanel.animate()
@@ -148,6 +172,7 @@ public final class DispatchKeyEventHook extends XC_MethodHook implements Propert
                     }
                     mViewNodes.remove(mCurrentViewIndex--);
                     seekbar.setMax(mViewNodes.size() - 1);
+                    seekbarreduce();
                 } catch (Exception e) {
                     Logger.e(TAG, "block fail", e);
                     Toast.makeText(activity, GmResources.getString(R.string.block_fail, e.getMessage()), Toast.LENGTH_SHORT).show();
@@ -166,9 +191,9 @@ public final class DispatchKeyEventHook extends XC_MethodHook implements Propert
                 }
             });
             View btnUp = mNodeSelectorPanel.findViewById(R.id.Up);
-            btnUp.setOnClickListener(v -> seekbaradd());
+            btnUp.setOnClickListener(v -> seekbarreduce());
             View btnDown = mNodeSelectorPanel.findViewById(R.id.Down);
-            btnDown.setOnClickListener(v -> seekbarreduce());
+            btnDown.setOnClickListener(v -> seekbaradd());
             container.addView(mNodeSelectorPanel);
             mNodeSelectorPanel.setAlpha(0);
             mNodeSelectorPanel.post(() -> {
@@ -188,18 +213,35 @@ public final class DispatchKeyEventHook extends XC_MethodHook implements Propert
                         int action = event.getAction();
                         int keyCode = event.getKeyCode();
                         if (action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
-                            seekbarreduce();
-                        } else if (action == KeyEvent.ACTION_UP && keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
                             seekbaradd();
+                        } else if (action == KeyEvent.ACTION_UP && keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+                            seekbarreduce();
                         }
                         param.setResult(true);
                     }
                 }
             });
+            View btnRollback = mNodeSelectorPanel.findViewById(R.id.Rollback);
+            btnRollback.setOnClickListener(v -> rollbackRule());
         } catch (Exception e) {
             //god mode package uninstalled?
             Logger.e(TAG, "showNodeSelectPanel fail", e);
             mKeySelecting = false;
+        }
+    }
+
+    private void rollbackRule() {
+        if (GodModeInjector.mRollbackRules.isEmpty()) {
+            Toast.makeText(activity, GmResources.getString(R.string.rollback_none), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Pair<WeakReference<View>, ViewRule> pop = GodModeInjector.mRollbackRules.pop();
+
+        if (GodModeManager.getInstance().deleteRule(BuildConfig.APPLICATION_ID, pop.second)) {
+            ViewController.revokeRule(pop.first.get(), pop.second);
+            Toast.makeText(activity, "已经还原 !", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(activity, "天地啊 ! 还原失败了", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -222,8 +264,10 @@ public final class DispatchKeyEventHook extends XC_MethodHook implements Propert
     }
 
     private void dismissNodeSelectPanel() {
-        if (mMaskView != null) mMaskView.detachFromContainer();
-        mMaskView = null;
+        if (mMaskView != null) {
+            mMaskView.detachFromContainer();
+            mMaskView = null;
+        }
         if (mNodeSelectorPanel != null) {
             final View nodeSelectorPanel = mNodeSelectorPanel;
             nodeSelectorPanel.post(() -> nodeSelectorPanel.animate()
@@ -241,6 +285,10 @@ public final class DispatchKeyEventHook extends XC_MethodHook implements Propert
         mViewNodes.clear();
         mCurrentViewIndex = 0;
         mKeySelecting = false;
+        if (mIdView != null) {
+            mIdView.detachFromContainer();
+            mIdView = null;
+        }
     }
 
     @Override
@@ -258,6 +306,7 @@ public final class DispatchKeyEventHook extends XC_MethodHook implements Propert
             Logger.d(TAG, String.format(Locale.getDefault(), "progress=%d selected view=%s", progress, view));
             if (view != null) {
                 mMaskView.updateOverlayBounds(ViewHelper.getLocationInWindow(view));
+                this.mIdView.setOpViewName(ViewHelper.getResourceName(view));
             }
         }
     }

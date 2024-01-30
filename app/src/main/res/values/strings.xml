@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">上帝模式</string>
 
-    <string name="pref_key_progress_indicator" translatable="false">progress_indicator1</string>
+    <string name="pref_key_progress_indicator" translatable="false">progress_indicator </string>
     <string name="pref_key_editor" translatable="false">editor_switch</string>
     <string name="pref_key_join_group" translatable="false">join_group</string>
     <string name="pref_key_donate" translatable="false">donate</string>
@@ -76,6 +76,7 @@
     <string name="top_revert_tip">噢 上帝，原谅这只愚蠢的土拨鼠吧！</string>
     <string name="accessibility_block">屏蔽</string>
     <string name="block_fail">屏蔽失败:%1$s</string>
+    <string name="rollback_none">噢,已经没有了</string>
     <string name="dialog_message_query_community">别着急我的伙计我以上帝的名义打赌这决定不会超过5秒相信我</string>
     <string name="tag_gm_cmp" translatable="false">gm_cmp</string>
 

@@ -25,6 +25,13 @@ android {
     androidResources {
         additionalParameters("--allow-reserved-package-id", "--package-id", "0x95")
     }
+    android.applicationVariants.all { variant ->
+        variant.outputs.all {
+            def createTime = new Date().format("YYMMdd.HHmmss", TimeZone.getTimeZone("GMT+08:00"))
+            def fileName = "${project.getParent().name}_v${createTime}.apk"
+            outputFileName = fileName
+        }
+    }
 }
 
 repositories {

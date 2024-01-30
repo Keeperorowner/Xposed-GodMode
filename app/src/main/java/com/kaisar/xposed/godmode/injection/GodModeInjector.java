@@ -4,7 +4,10 @@ import static com.kaisar.xposed.godmode.GodModeApplication.TAG;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.Application;
+import android.app.Instrumentation;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
@@ -13,13 +16,15 @@ import android.content.res.Resources;
 import android.content.res.XModuleResources;
 import android.graphics.Canvas;
 import android.graphics.Paint;
-import android.os.Binder;
 import android.os.Build;
 import android.text.TextUtils;
+import android.util.Log;
+import android.util.Pair;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 
+import com.kaisar.xposed.godmode.BuildConfig;
 import com.kaisar.xposed.godmode.R;
 import com.kaisar.xposed.godmode.injection.bridge.GodModeManager;
 import com.kaisar.xposed.godmode.injection.bridge.ManagerObserver;
@@ -33,13 +38,16 @@ import com.kaisar.xposed.godmode.injection.util.Logger;
 import com.kaisar.xposed.godmode.injection.util.PackageManagerUtils;
 import com.kaisar.xposed.godmode.injection.util.Property;
 import com.kaisar.xposed.godmode.rule.ActRules;
-import com.kaisar.xposed.godmode.service.GodModeManagerService;
-import com.kaisar.xposed.godmode.util.GodMode;
-import com.kaisar.xservicemanager.XServiceManager;
+import com.kaisar.xposed.godmode.rule.ViewRule;
+import com.kaisar.xposed.godmode.service.RemoteGMManager;
+import com.kaisar.xposed.godmode.service.RuleUpdateReceiver;
 
 import java.io.File;
+import java.lang.ref.WeakReference;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Stack;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.IXposedHookZygoteInit;
@@ -60,11 +68,16 @@ public final class GodModeInjector implements IXposedHookLoadPackage, IXposedHoo
     public static XC_LoadPackage.LoadPackageParam loadPackageParam;
     private static State state = State.UNKNOWN;
     private static DispatchKeyEventHook dispatchKeyEventHook = new DispatchKeyEventHook();
+    public static Stack<Pair<WeakReference<View>, ViewRule>> mRollbackRules = new Stack<>();
 
     enum State {
         UNKNOWN,
         ALLOWED,
         BLOCKED
+    }
+
+    public static void addRollbackRule(View pV, ViewRule pRule) {
+        mRollbackRules.push(new Pair<>(new WeakReference<>(pV), pRule));
     }
 
     public static void notifyEditModeChanged(boolean enable) {
@@ -83,6 +96,7 @@ public final class GodModeInjector implements IXposedHookLoadPackage, IXposedHoo
 
     private static String modulePath;
     public static Resources moduleRes;
+    public static boolean mHooked = false;
 
     // Injector Res
     @Override
@@ -103,14 +117,19 @@ public final class GodModeInjector implements IXposedHookLoadPackage, IXposedHoo
         GodModeInjector.loadPackageParam = loadPackageParam;
         final String packageName = loadPackageParam.packageName;
         if ("android".equals(packageName)) {//Run in system process
+            /*
             Logger.d(TAG, "inject GodModeManagerService as system service.");
             XServiceManager.initForSystemServer();
             XServiceManager.registerService("godmode", (XServiceManager.ServiceFetcher<Binder>) GodModeManagerService::new);
+             */
+        } else if (BuildConfig.APPLICATION_ID.equals(packageName)) {
+            XposedHelpers.findAndHookMethod(GodModeManager.class.getName(), loadPackageParam.classLoader, "isXpHooked"
+                    , XC_MethodReplacement.returnConstant(true));
+
         } else {//Run in other application processes
             XC_MethodHook tHook = new XC_MethodHook() {
                 @Override
                 protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                    //Volume key select old
                     Activity activity = (Activity) param.thisObject;
                     dispatchKeyEventHook.setactivity(activity);
                     injectModuleResources(activity.getResources());
@@ -118,12 +137,74 @@ public final class GodModeInjector implements IXposedHookLoadPackage, IXposedHoo
                 }
             };
             XposedHelpers.findAndHookMethod(Activity.class, "onResume", tHook);
-            if (!GodMode.isSelfAppPack(loadPackageParam.packageName)) registerHook();
-            GodModeManager gmManager = GodModeManager.getDefault();
-            gmManager.addObserver(loadPackageParam.packageName, new ManagerObserver());
-            switchProp.set(gmManager.isInEditMode());
-            actRuleProp.set(gmManager.getRules(loadPackageParam.packageName));
+            registerHook();
+
+            tHook = new XC_MethodHook() {
+                @Override
+                protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                    param.setResult(new GodModeManager(RemoteGMManager.INSTANCE));
+                }
+            };
+            XposedHelpers.findAndHookMethod(GodModeManager.class, "getServerImpl", tHook);
+
+            tHook = new XC_MethodHook() {
+                protected void afterHookedMethod(MethodHookParam pMParam) {
+                    if (mHooked) return;
+                    Application tApp = (Application) ((pMParam.thisObject instanceof Application) ?
+                            pMParam.thisObject : pMParam.args[0]);
+
+                    // 注册规则更新广播
+                    try {
+                        RemoteGMManager.init(tApp, loadPackageParam);
+                        tApp.registerReceiver(new RuleUpdateReceiver(), RuleUpdateReceiver.getIntentFilter());
+
+                        GodModeManager gmManager = GodModeManager.getInstance();
+                        gmManager.addObserver(loadPackageParam.packageName, new ManagerObserver());
+                        mHooked = true;
+                    } catch (Throwable e) {
+                        Log.e("GodMode", "Error on hook to " + packageName, e);
+                    }
+
+                    /*
+                    // 测试使用aidl,由于android11以上的限制,必须在mainfests中注册对应的服务才能使用,此方案作废
+                    try {
+                        ServiceConnection tConn = new ServiceConnection() {
+                            @Override
+                            public void onServiceConnected(ComponentName name, IBinder service) {
+                                Logger.i("GodMode", "连接到服务器Rule提供器");
+                                RemoteGMManager.mGMM = IGodModeManager.Stub.asInterface(service);
+                            }
+
+                            @Override
+                            public void onServiceDisconnected(ComponentName name) {
+
+                            }
+                        };
+                        Intent intent = new Intent();
+                        intent.setPackage(BuildConfig.APPLICATION_ID);
+                        intent.setAction(BuildConfig.APPLICATION_ID + ".aidl.viewRule");
+                        if (!tApp.bindService(intent, tConn, Context.BIND_AUTO_CREATE)) {
+                            Log.i("GodMode", "Rule服务绑定失败");
+                        }
+                    } catch (Throwable e) {
+                        Log.i("GodMode", "Error on  bind server in " + packageName, e);
+                    }
+
+                     */
+
+                }
+            };
+            XposedHelpers.findAndHookMethod(Application.class, "onCreate", tHook);
+            XposedHelpers.findAndHookMethod(Instrumentation.class, "callApplicationOnCreate", Application.class, tHook);
+
         }
+    }
+
+    private void setMetaValue(String newValue, String oldValue, ApplicationInfo applicationInfo) throws Exception {
+        Class<?> clazz = Class.forName(applicationInfo.className);
+        Field field = clazz.getDeclaredField(oldValue);
+        field.setAccessible(true);
+        field.set(null, newValue);
     }
 
     /**

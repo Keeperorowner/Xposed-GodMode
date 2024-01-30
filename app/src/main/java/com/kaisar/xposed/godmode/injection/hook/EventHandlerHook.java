@@ -19,6 +19,7 @@ import android.view.WindowManager;
 import android.widget.Toast;
 
 import com.kaisar.xposed.godmode.R;
+import com.kaisar.xposed.godmode.injection.GodModeInjector;
 import com.kaisar.xposed.godmode.injection.ViewController;
 import com.kaisar.xposed.godmode.injection.ViewHelper;
 import com.kaisar.xposed.godmode.injection.bridge.GodModeManager;
@@ -28,7 +29,6 @@ import com.kaisar.xposed.godmode.injection.weiget.CancelView;
 import com.kaisar.xposed.godmode.injection.weiget.MaskView;
 import com.kaisar.xposed.godmode.injection.weiget.ParticleView;
 import com.kaisar.xposed.godmode.rule.ViewRule;
-import com.kaisar.xposed.godmode.util.GodMode;
 import com.kaisar.xposed.godmode.util.Preconditions;
 
 import java.lang.ref.WeakReference;
@@ -123,6 +123,7 @@ public final class EventHandlerHook extends XC_MethodHook implements Property.On
             if (mLongClick) {
                 mMaskView.updateOverlayBounds((int) (event.getRawX() - this.mDeltaX), (int) (event.getRawY() - this.mDeltaY), v.getWidth(), v.getHeight());
                 mMaskView.setMarked(mCancelView.getRealBounds().intersect(mMaskView.getRealBounds()));
+                mCancelView.setOpViewName(ViewHelper.getResourceName(v));
             }
         } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
             ViewParent parent = v.getParent();
@@ -239,7 +240,8 @@ public final class EventHandlerHook extends XC_MethodHook implements Property.On
                     //Make original view gone
                     mViewRule.visibility = View.GONE;
                     ViewController.applyRule(v, mViewRule);
-                    GodModeManager.getInstance(true).writeRule(v.getContext().getPackageName(), mViewRule, mSnapshot);
+                    GodModeManager.getInstance().writeRule(v.getContext().getPackageName(), mViewRule, mSnapshot);
+                    GodModeInjector.addRollbackRule(v, mViewRule);
                     recycleNullableBitmap(mSnapshot);
                     mMaskView.detachFromContainer();
                 }
