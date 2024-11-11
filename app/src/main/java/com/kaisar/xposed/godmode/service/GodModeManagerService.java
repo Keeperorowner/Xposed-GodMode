@@ -9,7 +9,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.Binder;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
@@ -18,7 +17,6 @@ import android.os.ParcelFileDescriptor;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import android.text.TextUtils;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 
@@ -48,8 +46,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import de.robv.android.xposed.XposedBridge;
-
 
 /**
  * Created by jrsen on 17-10-15.
@@ -61,7 +57,8 @@ import de.robv.android.xposed.XposedBridge;
 public final class GodModeManagerService extends IGodModeManager.Stub implements Handler.Callback {
 
     // /data/system/godmode
-    private final String BASE_DIR;
+    private final String BASE_DIR_STR;
+    private File BASE_DIR;
     // /data/system/godmode/conf
     private static final String CONFIG_FILE_NAME = "conf";
     // /data/system/godmode/{package}/package.rule
@@ -88,19 +85,24 @@ public final class GodModeManagerService extends IGodModeManager.Stub implements
         HandlerThread workThread = new HandlerThread("work-thread");
         workThread.start();
         mHandle = new Handler(workThread.getLooper(), this);
-        BASE_DIR = String.format("%s/%s", this.mContext.getFilesDir().getAbsolutePath(), "godmode");
+        BASE_DIR=GodModeApplication.getBaseDir(context);
+        BASE_DIR_STR = BASE_DIR.getAbsolutePath();
 
         try {
             loadRuleData();
             mStarted = true;
         } catch (Exception e) {
             mStarted = false;
-            mLogger.e("loadPreferenceData failed " + BASE_DIR, e);
+            mLogger.e("loadPreferenceData failed " + BASE_DIR_STR, e);
         }
     }
 
+    public File getTempImg(String pName) throws FileNotFoundException {
+        return new File(getBaseDir(),pName);
+    }
+
     private void loadRuleData() throws IOException {
-        File dataDir = new File(getBaseDir());
+        File dataDir = getBaseDir();
         File[] packageDirs = dataDir.listFiles(File::isDirectory);
         if (packageDirs != null && packageDirs.length > 0) {
             HashMap<String, ActRules> appRules = new HashMap<>();
@@ -448,7 +450,7 @@ public final class GodModeManagerService extends IGodModeManager.Stub implements
     @Override
     public ParcelFileDescriptor openImageFileDescriptor(String filePath) throws RemoteException {
         enforcePermission("open fd fail permission denied");
-        if (!filePath.startsWith(BASE_DIR) || !filePath.endsWith(IMAGE_FILE_SUFFIX))
+        if (!filePath.startsWith(BASE_DIR_STR) || !filePath.endsWith(IMAGE_FILE_SUFFIX))
             throw new RemoteException(String.format("unauthorized access %s", filePath));
         try {
             return ParcelFileDescriptor.open(new File(filePath), ParcelFileDescriptor.MODE_READ_ONLY);
@@ -506,14 +508,9 @@ public final class GodModeManagerService extends IGodModeManager.Stub implements
         }
     }
 
-    private String getBaseDir() throws FileNotFoundException {
-        mLogger.d(BASE_DIR);
-        File dir = new File(BASE_DIR);
-        if (dir.exists() || dir.mkdirs()) {
-            FileUtils.setPermissions(dir, S_IRWXU | S_IRWXG | S_IRWXO, -1, -1);
-            return dir.getAbsolutePath();
-        }
-        throw new FileNotFoundException();
+    private File getBaseDir() {
+        mLogger.d(BASE_DIR_STR);
+        return this.BASE_DIR;
     }
 
     private String getConfigFilePath() throws IOException {
