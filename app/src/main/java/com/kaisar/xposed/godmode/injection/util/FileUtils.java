@@ -2,6 +2,7 @@ package com.kaisar.xposed.godmode.injection.util;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -9,10 +10,13 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Created by jrsen on 17-10-21.
@@ -266,5 +270,365 @@ public final class FileUtils {
         } finally {
             out.close();
         }
+    }
+
+    /**
+     * 删除一个文件,如果文件是文件夹,那么会删除这个文件夹中的所有内容
+     *
+     * @param pFile
+     *            文件
+     * @throws IOException
+     */
+    public static void deleteFile(File pFile) {
+        if (pFile == null || !pFile.exists())
+            return;
+        if (pFile.isDirectory())
+            clearDir(pFile);
+        if (!pFile.delete()) {
+            System.gc();
+            pFile.delete();
+        }
+    }
+
+    /**
+     * 清空一个文件夹
+     *
+     * @param pDir
+     *            文件夹
+     */
+    public static void clearDir(File pDir) {
+        if (!pDir.isDirectory())
+            return;
+
+        File[] tSubFiles = pDir.listFiles();
+        if (tSubFiles != null) {
+            for (File sChildFile : tSubFiles) {
+                deleteFile(sChildFile);
+            }
+        }
+    }
+
+    /**
+     * 创建一个新文件
+     *
+     * @param pFile
+     *            要创建的文件
+     * @param pReplace
+     *            是否替换已经存在的文件
+     * @throws IOException
+     */
+    public static void createNewFile(File pFile, boolean pReplace) throws IOException {
+        if (pFile == null)
+            return;
+        if (pFile.isFile()) {
+            if (!pReplace) {
+                return;
+            } else {
+                deleteFile(pFile);
+            }
+        }
+
+        pFile = pFile.getAbsoluteFile();
+        File tParent = pFile.getParentFile();
+        if (!tParent.isDirectory()) {
+            if (!tParent.mkdirs()) {
+                throw new IOException("File '" + pFile + "' could not be created");
+            }
+        }
+        pFile.createNewFile();
+    }
+
+    /**
+     * 使用给定的文件打开输出流
+     * <p>
+     * 如果文件不存在,将会自动创建
+     * </p>
+     *
+     * @param pFile
+     *            指定的文件
+     * @return 创建的输出流
+     * @throws IOException
+     */
+    public static FileOutputStream openOutputStream(File pFile) throws IOException {
+        return openOutputStream(pFile, true);
+    }
+
+    /**
+     * 从给定的文件打开输出流
+     * <p>
+     * 如果文件不存在,将会自动创建
+     * </p>
+     *
+     * @param pFile
+     *            指定的文件
+     * @param pAppend
+     *            是否以追加模式打开
+     * @return 创建的输出流
+     * @throws IOException
+     *             可能发生的异常
+     */
+    public static FileOutputStream openOutputStream(File pFile, boolean pAppend) throws IOException {
+        if (!pFile.isFile()) {
+            createNewFile(pFile, !pAppend);
+        }
+        return new FileOutputStream(pFile, pAppend);
+    }
+
+    /**
+     * 使用指定文件创建一个输入流
+     *
+     * @param pFile
+     *            要打开的文件
+     * @return 创建的输入流
+     * @throws IOException
+     *             创建输入流时发生错误
+     */
+    public static FileInputStream openInputStream(File pFile) throws IOException {
+        if (!pFile.isFile()) {
+            createNewFile(pFile, false);
+        }
+        return new FileInputStream(pFile);
+    }
+
+    /**
+     * 将文件内容全部读取出来,并使用UTF-8编码转换为String
+     *
+     * @param pFile
+     *            要读取的文件
+     * @return 文件内容
+     * @throws IOException
+     *             报错
+     */
+    public static String readContent(File pFile) {
+        return readContent(pFile, "UTF-8");
+    }
+
+    /**
+     * 将文件内容全部读取出来,并使用指定编码转换为String
+     *
+     * @param pFile
+     *            要读取的文件
+     * @param pEncoding
+     *            使用的转换编码
+     * @return 文件内容
+     * @throws IOException
+     *             打开文件或读取数据时发生错误
+     */
+    public static String readContent(File pFile, String pEncoding) {
+        InputStream tIPStream = null;
+        try {
+            tIPStream = openInputStream(pFile);
+            return readContent(tIPStream, pEncoding);
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        } finally {
+            closeStream(tIPStream);
+        }
+    }
+
+    /**
+     * 将文件内容全部读取出来
+     *
+     * @param pFile
+     *            要读取的文件
+     * @return 文件内容
+     * @throws IOException
+     *             打开文件或读取数据时发生错误
+     */
+    public static byte[] readData(File pFile) {
+        InputStream tIPStream = null;
+        try {
+            tIPStream = openInputStream(pFile);
+            return readData(tIPStream);
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        } finally {
+            closeStream(tIPStream);
+        }
+    }
+
+    public static void writeData(File pFile, String pData) {
+        writeData(pFile, pData.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * 将文件内容全部读取出来
+     *
+     * @param pFile
+     *            要读取的文件
+     * @param pData
+     *            写入的数据
+     * @throws IOException
+     *             打开文件或读取数据时发生错误
+     */
+    public static void writeData(File pFile, byte[] pData) {
+        writeData(pFile, pData, 0, pData.length);
+    }
+
+    /**
+     * 将文件内容全部读取出来
+     *
+     * @param pFile
+     *            要读取的文件
+     * @param pData
+     *            写入的数据
+     * @param pOffest
+     *            数据偏移量
+     * @param pLength
+     *            写入的数据长度
+     * @throws IOException
+     *             打开文件或读取数据时发生错误
+     */
+    public static void writeData(File pFile, byte[] pData, int pOffest, int pLength) {
+        OutputStream tOStream = null;
+        try {
+            tOStream = openOutputStream(pFile, false);
+            tOStream.write(pData, pOffest, pLength);
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        } finally {
+            closeStream(tOStream);
+        }
+    }
+
+    public static void copyFile(File srcFile, File destFile) {
+        copyFile(srcFile, destFile, true);
+    }
+
+    /**
+     * 复制文件到新位置
+     * <p>
+     * 如果目标文件或文件夹不存在,将会自动创建<br>
+     * 如果目标文件存在,将会覆盖
+     * </p>
+     *
+     * @param pSourceFile
+     *            要被复制的文件
+     * @param pDestFile
+     *            复制到的新文件
+     * @param pCopyFileInfo
+     *            是否设置复制后的文件的修改日期与源文件相同
+     * @throws IOException
+     *             源文件不存在,创建新文件时发生错误,读取数据时发生错误
+     */
+    public static void copyFile(File pSourceFile, File pDestFile, boolean pCopyFileInfo) {
+        try {
+            if (pSourceFile.getCanonicalPath().equals(pDestFile.getCanonicalPath()))
+                return;
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+
+        FileInputStream tIPStream = null;
+        FileOutputStream tOPStream = null;
+        try {
+            tIPStream = new FileInputStream(pSourceFile);
+            tOPStream = openOutputStream(pDestFile, false);
+            copy(tIPStream, tOPStream);
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        } finally {
+            closeStream(tIPStream, tOPStream);
+        }
+        if (pCopyFileInfo) {
+            pDestFile.setLastModified(Math.max(0, pSourceFile.lastModified()));
+        }
+    }
+    /**
+     * 关闭一个流
+     *
+     * @param pSteams
+     *            流
+     * @return 是否无报错的关闭了
+     */
+    public static boolean closeStream(Closeable...pSteams){
+        boolean pHasError=false;
+        for(Closeable sCloseable : pSteams){
+            if(sCloseable!=null){
+                try{
+                    sCloseable.close();
+                }catch(Exception exp){
+                    pHasError=true;
+                }
+            }
+        }
+
+        return !pHasError;
+    }
+
+    /**
+     * 关闭一个连接
+     *
+     * @param pConns
+     *            连接
+     * @return 连接是否无报错的关闭了
+     */
+    public static boolean closeStream(AutoCloseable...pConns){
+        boolean pHasError=false;
+        for(AutoCloseable sCloseable : pConns){
+            if(sCloseable!=null){
+                try{
+                    sCloseable.close();
+                }catch(Exception exp){
+                    pHasError=true;
+                }
+            }
+        }
+
+        return !pHasError;
+    }
+
+    /**
+     * 将流中的内容全部读取出来,并使用指定编码转换为String
+     *
+     * @param pIPStream
+     *            输入流
+     * @param pEncoding
+     *            转换编码
+     * @return 读取到的内容
+     * @throws IOException
+     *             读取数据时发生错误
+     * @throws UnsupportedEncodingException
+     */
+    public static String readContent(InputStream pIPStream,String pEncoding) throws IOException{
+        if(pEncoding==null||pEncoding.isEmpty()){
+            return readContent(new InputStreamReader(pIPStream));
+        }else{
+            return readContent(new InputStreamReader(pIPStream,pEncoding));
+        }
+    }
+
+    /**
+     * 将流中的内容全部读取出来
+     *
+     * @param pIPSReader
+     *            输入流
+     * @return 读取到的内容
+     * @throws IOException
+     *             读取数据时发生错误
+     */
+    public static String readContent(InputStreamReader pIPSReader) throws IOException{
+        int readCount=0;
+        char[] tBuff=new char[4096];
+        StringBuilder tSB=new StringBuilder();
+        while((readCount=pIPSReader.read(tBuff))!=-1){
+            tSB.append(tBuff,0,readCount);
+        }
+        return tSB.toString();
+    }
+
+    /**
+     * 将流中的内容全部读取出来
+     *
+     * @param pIStream
+     *            输入流
+     * @return 读取到的内容
+     * @throws IOException
+     *             读取数据时发生错误
+     */
+    public static byte[] readData(InputStream pIStream) throws IOException{
+        ByteArrayOutputStream tBAOStream=new ByteArrayOutputStream();
+        copy(pIStream,tBAOStream);
+        return tBAOStream.toByteArray();
     }
 }
