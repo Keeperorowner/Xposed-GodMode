@@ -166,33 +166,6 @@ public final class GodModeInjector implements IXposedHookLoadPackage, IXposedHoo
                         Log.e("GodMode", "Error on hook to " + packageName, e);
                     }
 
-                    /*
-                    // 测试使用aidl,由于android11以上的限制,必须在mainfests中注册对应的服务才能使用,此方案作废
-                    try {
-                        ServiceConnection tConn = new ServiceConnection() {
-                            @Override
-                            public void onServiceConnected(ComponentName name, IBinder service) {
-                                Logger.i("GodMode", "连接到服务器Rule提供器");
-                                RemoteGMManager.mGMM = IGodModeManager.Stub.asInterface(service);
-                            }
-
-                            @Override
-                            public void onServiceDisconnected(ComponentName name) {
-
-                            }
-                        };
-                        Intent intent = new Intent();
-                        intent.setPackage(BuildConfig.APPLICATION_ID);
-                        intent.setAction(BuildConfig.APPLICATION_ID + ".aidl.viewRule");
-                        if (!tApp.bindService(intent, tConn, Context.BIND_AUTO_CREATE)) {
-                            Log.i("GodMode", "Rule服务绑定失败");
-                        }
-                    } catch (Throwable e) {
-                        Log.i("GodMode", "Error on  bind server in " + packageName, e);
-                    }
-
-                     */
-
                 }
             };
             XposedHelpers.findAndHookMethod(Application.class, "onCreate", tHook);
